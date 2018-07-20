@@ -1,0 +1,162 @@
+-- copy you dataset from local file system to HDFS
+hadoop fs -ls -copyFromLocal /root/pig/OlympicAthletes.csv pig/
+
+-- register you piggybank.jar to pig using grunt shell
+REGISTER pig/piggybank.jar
+
+-- define csvExcelStorage format to load data
+define CSVExcelStorage org.apache.pig.piggybank.storage.CSVExcelStorage();
+
+-- load data into pig
+olympicAthletes = LOAD 'pig/OlympicAthletes.csv'
+USING CSVExcelStorage(',' , 'YES_MULTILINE', 'NO_CHANGE', 'SKIP_INPUT_HEADER')
+AS (athlete: chararray, country:chararray, year:int, sport:chararray, gold:int, silver:int, bronze:int, total:int);
+
+limitAthletes = LIMIT olympicAthletes 10;
+DUMP limitAthletes;
+
+-------------------------------------------------------------------------------------------------------------------------------
+Q1 : Calculate the number of medals won by each country in our data.
+
+athletesByCountry = GROUP olympicAthletes BY country;
+
+-- grunt> describe athletesByCountry;
+-- athletesByCountry: {group: chararray,olympicAthletes: {(athlete: chararray,country: chararray,year: int,sport:   chararray,gold: int,silver: int,bronze: int,total: int)}}
+
+medalsPerCountry = FOREACH athletesByCountry GENERATE group as country, SUM(olympicAthletes.total) as Medals; 
+
+dump medalsPerCountry limit 10;
+
+Similarly you can calculate the count of each type of medal.
+
+medalsPerCountry = FOREACH athletesByCountry GENERATE group AS country, 
+SUM(olympicAthletes.gold) as GOLD, 
+SUM(olympicAthletes.silver) as SILVER, 
+SUM(olympicAthletes.bronze) as BRONZE; 
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q2: Calculate the number of medals won by each athlete and corresponding year for his country in our data.
+
+medalsPerYearWonByAthlete = FOREACH olympicAthletes GENERATE athlete, year, total, country;						   
+limitMedals = LIMIT medalsWonByAthlete 10;
+dump limitMedals;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q3: Calculate the number of medals won by each athlete for his country in our data.
+
+groupByAthletes = GROUP olympicAthletes BY athlete;
+medalsWonByAthlete = FOREACH groupByAthletes GENERATE group as athlete, SUM(olympicAthletes.total), olympicAthletes.country;
+limitMedals = LIMIT medalsWonByAthlete 10;
+dump limitMedals;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q4: display list of distinct coutries.
+
+distinctCountries = DISTINCT (FOREACH olympicAthletes GENERATE country);
+
+-- Count of distinct countries 
+distinctCountryCount = FOREACH (GROUP distinctCountries ALL) GENERATE COUNT(distinctCountries);
+dump distinctCountryCount;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q5: Find out what the min and max dates on our data are.
+
+minMaxDate = FOREACH (GROUP olympicAthletes ALL) GENERATE MIN(olympicAthletes.year), MAX(olympicAthletes.year);
+dump minMaxDate;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q6: Find the country with the most medals by using ORDER and then LIMIT.
+
+groupByCountry = GROUP olympicAthletes BY country;
+medalsByCountry = FOREACH groupByCountry GENERATE group as country, SUM(olympicAthletes.total) as medals;
+mostMedalsCountry = LIMIT (ORDER medalsByCountry BY medals DESC) 1;
+
+OR
+
+-- We have already calculated medals per country in our first answer, you can use that.
+orderMedalsPerCountry = ORDER medalsPerCountry BY Medals DESC;
+mostMedalsCountry = LIMIT orderMedalsPerCountry 1;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q7: What were the top five countries in medal count?
+
+top5Countries = LIMIT orderMedalsPerCountry 5;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q8: What would happen if we changed DESC to ASC?
+We will get 5 countries with least medals.
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q9: Find the country with the most medals EXCLUDING swimming medals.
+
+filterOlympicAthletes = FILTER olympicAthletes BY sport != 'Swimming';
+groupByCountry = GROUP filterOlympicAthletes BY country;
+countryWithMedals = FOREACH groupByCountry GENERATE group as country, SUM(filterOlympicAthletes.total) as medals;
+mostMedalsCountry = LIMIT (ORDER countryWithMedals BY medals DESC) 1;
+dump mostMedalsCountry;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q10: How many countries won only 1 medal?
+
+groupByCountry = GROUP olympicAthletes BY country;
+countryWithMedals = FOREACH groupByCountry GENERATE group as country, SUM(olympicAthletes.total) as medals;
+oneMedalCountries = FILTER countryWithMedals BY medals == 1;
+countOneMedalCountries = FOREACH (GROUP oneMedalCountries BY medals) GENERATE COUNT(oneMedalCountries.medals);
+dump countOneMedalCountries;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q11: Find the athletes who have gotten the same number of medals in consecutive Olympics. (Hint: do a JOIN, then a FILTER. Note that consecutive Olympics occur four years apart.)
+
+olympicAthletesCopy = FOREACH olympicAthletes GENERATE athlete, year as consecutiveYear, total as consecutiveTotal;
+joinWithOlympicAthletes = JOIN olympicAthletes BY athlete, olympicAthletesCopy BY athlete;
+
+filterCondition = FILTER joinWithOlympicAthletes BY total == consecutiveTotal AND year + 4 == consecutiveYear;
+athletes = FOREACH filterCondition GENERATE olympicAthletes::athlete, year, consecutiveYear, medal;
+limitAthletes = limit athletes 10;
+dump limitAthletes;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q12: Find out the ones who won more than 3 medals twice?
+
+olympicAthletesCopy = FOREACH olympicAthletes GENERATE athlete, year as consecutiveYear, total as consecutiveTotal;
+joinWithOlympicAthletes = JOIN olympicAthletesCopy BY athlete, olympicAthletes BY athlete;
+
+-- OR you can take join relation from quetion 11 directly and continue
+
+moreThan3Medals = FILTER joinWithOlympicAthletes 
+BY year + 4 == consecutiveYear 
+AND consecutiveTotal > 3
+AND total > 3; 
+
+athletes = FOREACH moreThan3Medals GENERATE olympicAthletes::athlete, year, consecutiveYear, total, consecutiveTotal;
+dump athletes;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q13: Create a summer_olympics and winter_olympics data set. (Hint: you can use the ‘%’ sign for modular arithmetic in Pig, just like in other languages, and the summer Olympics happen in years divisible by 4.)
+
+SPLIT olympicAthletes INTO 
+summerOlympic IF year % 4 == 0,
+winterOlympic IF year % 4 != 0;
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+Q14: Which country has won the most winter Olympic medals? (We promise it’s interesting.)
+
+groupByCountry = GROUP winterOlympic BY country;
+medalsByCountry = FOREACH groupByCountry GENERATE group as country, SUM(winterOlympic.total) as medals;
+mostMedalCountry = LIMIT (ORDER medalsByCountry BY medals DESC) 1;
+dump mostMedalCountry;
+
+-------------------------------------------------------------------------------------------------------------------------------
