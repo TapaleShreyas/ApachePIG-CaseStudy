@@ -1,0 +1,14 @@
+Q1 : Calculate the number of medals won by each country in our data.
+Q2: Calculate the number of medals won by each athlete and corresponding year for his country in our data.
+Q3: Calculate the number of medals won by each athlete for his country in our data.
+Q4: display list of distinct coutries.
+Q5: Find out what the min and max dates on our data are.
+Q6: Find the country with the most medals by using ORDER and then LIMIT.
+Q7: What were the top five countries in medal count?
+Q8: What would happen if we changed DESC to ASC?
+Q9: Find the country with the most medals EXCLUDING swimming medals.
+Q10: How many countries won only 1 medal?
+Q11: Find the athletes who have gotten the same number of medals in consecutive Olympics. (Hint: do a JOIN, then a FILTER. Note that consecutive Olympics occur four years apart.)
+Q12: Find out the ones who won more than 3 medals twice?
+Q13: Create a summer_olympics and winter_olympics data set. (Hint: you can use the ‘%’ sign for modular arithmetic in Pig, just like in other languages, and the summer Olympics happen in years divisible by 4.)
+Q14: Which country has won the most winter Olympic medals? (We promise it’s interesting.)
